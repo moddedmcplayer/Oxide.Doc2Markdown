@@ -55,6 +55,9 @@ public class FileModelsProcessor
         List<string> result = new List<string>();
         for (var i = 0; i < lines.Length; i++)
         {
+            // ReSharper disable once ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract
+            if (lines[i] == null)
+                continue;
             if (lines[i].TrimEnd().EndsWith("hideifnone"))
             {
                 var split = lines[i].Split(":");
@@ -73,7 +76,10 @@ public class FileModelsProcessor
                         continue;
                 }
 
-                int count = WhereType(model, Enum.Parse<MemberType>(type, true)).Count();
+                int count;
+                count = first.Type == MemberType.Namespace ?
+                    WhereTypeType(model, Enum.Parse<MemberType>(type, true)).Count()
+                    : WhereTypeMethod(model, Enum.Parse<MemberType>(type, true)).Count();
                 if (count == 0)
                     continue;
                 lines[i] = split[0];
@@ -91,20 +97,32 @@ public class FileModelsProcessor
                         continue;
                 }
 
-                var models = WhereType(model, Enum.Parse<MemberType>(type, true)).ToArray();
-
-                result.AddRange(models.Select(member => Interpolate(split[2], _documentViewModels[member.Uid])));
+                if (first.Type == MemberType.Namespace)
+                {
+                    var models = WhereTypeType(model, Enum.Parse<MemberType>(type, true)).ToArray();
+                    result.AddRange(models.SelectMany(member =>
+                        Interpolate(split[2], _documentViewModels[member.Uid]).Split(new []{"\n", "\\n"}, StringSplitOptions.RemoveEmptyEntries)));
+                }
+                else
+                {
+                    var models = WhereTypeMethod(model, Enum.Parse<MemberType>(type, true)).ToArray();
+                    result.AddRange(models.SelectMany(member =>
+                        Interpolate(split[2], member).Split(new []{"\n", "\\n"}, StringSplitOptions.RemoveEmptyEntries)));
+                }
                 continue;
             }
             result.Add(Interpolate(lines[i], first));
         }
 
-        return string.Join("\n", result) + '\n' + model.ToJsonString(Formatting.Indented);
+        return string.Join("\n", result) + "\n\n\n\n\n\n\nJSON:\n" + model.ToJsonString(Formatting.Indented);
     }
 
-    private IEnumerable<ReferenceViewModel> WhereType(PageViewModel model, MemberType type) => 
+    private IEnumerable<ReferenceViewModel> WhereTypeType(PageViewModel model, MemberType type) => 
         model.References.Skip(1)
-        .Where(x => _memberTypes[x.Uid] == type);
+        .Where(x => _memberTypes.ContainsKey(x.Uid) && _memberTypes[x.Uid] == type);
+    private IEnumerable<ItemViewModel> WhereTypeMethod(PageViewModel model, MemberType type) => 
+        model.Items.Skip(1)
+            .Where(x => x.Type == type);
 
     private static readonly List<string> DefaultBaseClasses = new List<string> { "System.Object" };
     private static readonly List<string> DefaultInheritedMethods = typeof(object).GetMethods().Select(x => string.Join(string.Empty, x.Name.TakeWhile(y => y != '('))).ToList();
@@ -148,13 +166,15 @@ public class FileModelsProcessor
         if (model.Inheritance == null || model.InheritedMembers == null)
             return "namespace";
         fullMethodName = string.Join("", fullMethodName.TakeWhile(y => y != '('));
-        var split = fullMethodName.Split('.');
-        string type = string.Join('.', split.SkipLast(1));
         if (model.Inheritance.Count == 1 && model.Inheritance[0] == "System.Object" && DefaultInheritedMethods.Contains(fullMethodName))
             return $"[{fullMethodName}](https://learn.microsoft.com/en-us/dotnet/api/system.object.{fullMethodName.ToLower()}?view=net-{_targetFramework.Replace("net", "")})";
+        var split = fullMethodName.Split('.');
+        string type = string.Join('.', split.SkipLast(1));
         string method = split.Last();
         if (type.StartsWith("System") || type.StartsWith("Microsoft"))
-            return $"[{method}](https://learn.microsoft.com/en-us/dotnet/api/{method.ToLower()}?view=net-{_targetFramework.Replace("net", "")})";
+            return method.Contains('.') 
+                ? $"[{method}](https://learn.microsoft.com/en-us/dotnet/api/{method.ToLower()}?view=net-{_targetFramework.Replace("net", "")})"
+                : $"[{method}](https://learn.microsoft.com/en-us/dotnet/api/{type.ToLower()}.{method.ToLower()}?view=net-{_targetFramework.Replace("net", "")})";
         string file = type + ".md";
         return File.Exists(file) ? $"[{method}]({file}#{split.Last()})" : method;
     }
