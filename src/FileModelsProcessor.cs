@@ -114,7 +114,7 @@ public class FileModelsProcessor
             result.Add(Interpolate(lines[i], first));
         }
 
-        return string.Join("\n", result) + "\n\n\n\n\n\n\nJSON:\n" + model.ToJsonString(Formatting.Indented);
+        return string.Join("\n", result);
     }
 
     private IEnumerable<ReferenceViewModel> WhereTypeType(PageViewModel model, MemberType type) => 
@@ -132,7 +132,7 @@ public class FileModelsProcessor
         List<string> inheritedMembers = model.InheritedMembers ?? DefaultInheritedMethods;
         return text
                 .Replace("{name}", model.Name)
-                .Replace("{namelinked}", $"[{model.Name}]({model.Id}.md)")
+                .Replace("{namelinked}", $"[{model.Name}]({model.FullName}.md)")
                 .Replace("{namespace}", $"[{model.NamespaceName}]({model.NamespaceName}.md)")
                 .Replace("{namespacelinked}", model.NamespaceName)
                 .Replace("{assemblies}", string.Join(", ", model.AssemblyNameList.Select(x => x + ".dll")))
@@ -143,21 +143,47 @@ public class FileModelsProcessor
                 .Replace("{remarks}", string.IsNullOrWhiteSpace(model.Remarks) ? "" : "Remarks: "+model.Remarks)
                 .Replace("{baseclasses}", string.Join(", ", inherited))
                 .Replace("{baseclasseslinked}",
-                    string.Join(", ", inherited.Select(GetTypeLink)))
+                    string.Join(", ", inherited.Select(x => GetTypeLink(x))))
                 .Replace("{examples}", string.Join("\n", model.Examples ?? new List<string>()))
                 .Replace("{inheritedmembers}", string.Join(", ", inheritedMembers))
                 .Replace("{inheritedmemberslinked}",
                     string.Join(", ", inheritedMembers.Select(x => GetBaseMethodLink(x, model))))
+                .Replace("{sourceurl}", model.Source == null ? string.Empty : $"[Source]({model.Source.Remote.RemoteRepositoryUrl}/tree/{model.Source.Remote.RemoteBranch}/{model.Source.Remote.RelativePath}#L{model.Source.StartLine})")
+                .Replace("{isextensionsmethod}", model.IsExtensionMethod ? "Yes" : "No")
+                .Replace("{isexplicitinterfaceimplementation}", model.IsExplicitInterfaceImplementation ? "Yes" : "No")
+                .Replace("{overriden}",  string.IsNullOrWhiteSpace(model.Overridden) ? string.Empty : "Overrides "+model.Overridden)
+                .Replace("{parameterslist}", GetParameterList(model))
             ;
+    }
+
+    private static string GetParameterList(ItemViewModel model)
+    {
+        if (model.Type != MemberType.Method)
+            return "not method";
+        var parameters = model.Syntax?.Parameters?.ToArray();
+        if (parameters == null || parameters.Length == 0)
+            return "None";
+        List<string> paramParsed = new List<string>();
+        foreach (var param in parameters)
+        {
+            #warning attributes not handled
+            paramParsed.Add($"{GetTypeLink(param.Type, true)} {param.Name} {param.Description}");
+        }
+        return string.Join("  \n", paramParsed);
     }
 
     public static void SetTargetFramework(string targetFramework) => _targetFramework = targetFramework;
     private static string _targetFramework = "net7.0";
-    private static string GetTypeLink(string type)
+    private static string GetTypeLink(string type, bool trimName = false)
     {
-        if (type.StartsWith("System") || type.StartsWith("Microsoft"))
-            return $"[{type}](https://learn.microsoft.com/en-us/dotnet/api/{type.ToLower()}?view=net-{_targetFramework.Replace("net", "")})";
-        string file = type + ".md";
+        if (type.Contains('('))
+            return string.Empty;
+        string fullName = type;
+        if (trimName)
+            type = type.Split('.').Last();
+        if (fullName.StartsWith("System") || fullName.StartsWith("Microsoft"))
+            return $"[{fullName}](https://learn.microsoft.com/en-us/dotnet/api/{fullName.ToLower()}?view=net-{_targetFramework.Replace("net", "")})";
+        string file = fullName + ".md";
         return File.Exists(file) ? $"[{type}]({file})" : type;
     }
 

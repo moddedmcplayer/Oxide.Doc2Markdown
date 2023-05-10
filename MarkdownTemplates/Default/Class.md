@@ -14,16 +14,16 @@ foreach:seealso:- {namelinked}
 {inheritedmemberslinked}  
 
 ## Properties :property:hideifnone
-foreach:property:{codeblock}\n{name}
+foreach:property:### {name}  \n{summary}  \n{codeblock}  \n{sourceurl}
 ## Constructors :constructor:hideifnone
-foreach:constructor:{codeblock}\n{name}
+foreach:constructor:### {name}  \n{summary}  \n{codeblock}  \n{sourceurl}
 ## Methods :method:hideifnone
-foreach:method:{codeblock}\n{name}
+foreach:method:### {name}  \n{summary}  \n{codeblock}  \n{sourceurl}  \n{overriden}  \n#### Parameters  \n{parameterslist}
 ## Fields :field:hideifnone
-foreach:field:{codeblock}\n{name}
+foreach:field:### {name}  \n{summary}  \n{codeblock}  \n{sourceurl}
 ## Events :event:hideifnone
-foreach:event:{codeblock}\n{name}
+foreach:event:### {name}  \n{summary}  \n{codeblock}  \n{sourceurl}
 ## Delegates :delegate:hideifnone
-foreach:delegate:{codeblock}\n{name}
+foreach:delegate:### {name}  \n{summary}  \n{codeblock}  \n{sourceurl}
 ## Operators :operator:hideifnone
-foreach:operator:{codeblock}\n{name}
+foreach:operator:### {name}  \n{summary}  \n{codeblock}  \n{sourceurl}
